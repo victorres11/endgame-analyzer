@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>End-of-Game Decision Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2c3e50;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .game-state {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .state-item {
+            text-align: center;
+        }
+        
+        .state-label {
+            font-size: 11px;
+            color: #bdc3c7;
+            margin-bottom: 3px;
+        }
+        
+        .state-value {
+            font-size: 18px;
+            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 4px;
+            background: #2c3e50;
+            min-width: 60px;
+        }
+        
+        .time-value { background: #f39c12; color: #2c3e50; }
+        .score-trailing { background: #e74c3c; }
+        .score-leading { background: #27ae60; }
+        .score-tied { background: #3498db; }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #34495e;
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+        
+        .control-group label {
+            font-size: 12px;
+            color: #bdc3c7;
+            white-space: nowrap;
+        }
+        
+        .control-group input, .control-group select {
+            padding: 4px;
+            border: none;
+            border-radius: 3px;
+            background: #2c3e50;
+            color: white;
+            font-size: 12px;
+        }
+        
+        .scenario-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            background: #34495e;
+            color: #bdc3c7;
+            padding: 10px 15px;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+        
+        .tab.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .tab:hover:not(.active) {
+            background: #4a5f7a;
+        }
+        
+        .decision-matrix {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .matrix-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .matrix-grid {
+            display: grid;
+            gap: 2px;
+            margin-bottom: 20px;
+        }
+        
+        .clock-management-grid {
+            grid-template-columns: 100px repeat(8, 1fr);
+        }
+        
+        .fourth-down-grid {
+            grid-template-columns: 80px repeat(10, 1fr);
+        }
+        
+        .scoring-grid {
+            grid-template-columns: 120px repeat(6, 1fr);
+        }
+        
+        .kickoff-grid {
+            grid-template-columns: 100px repeat(6, 1fr);
+        }
+        
+        .matrix-header {
+            background: #34495e;
+            color: white;
+            padding: 8px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .matrix-row-label {
+            background: #ecf0f1;
+            padding: 8px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+        }
+        
+        .matrix-cell {
+            aspect-ratio: 1.2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: bold;
+            border: 1px solid rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            padding: 2px;
+        }
+        
+        .matrix-cell:hover {
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        /* Strategy Colors */
+        .kneel { background-color: #27ae60; }
+        .run-clock { background-color: #2ecc71; }
+        .run-conservative { background-color: #f1c40f; }
+        .pass-selective { background-color: #e67e22; }
+        .two-minute { background-color: #e74c3c; }
+        .hail-mary { background-color: #8e44ad; }
+        
+        .go-4th { background-color: #2ecc71; }
+        .fg-4th { background-color: #f1c40f; }
+        .punt-4th { background-color: #e74c3c; }
+        
+        .pat { background-color: #27ae60; }
+        .go-2pt { background-color: #e74c3c; }
+        
+        .normal-kick { background-color: #27ae60; }
+        .squib-kick { background-color: #f1c40f; }
+        .onside-kick { background-color: #e74c3c; }
+        .pooch-kick { background-color: #e67e22; }
+        
+        .analysis {
+            background: #34495e;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .analysis-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .analysis-title {
+            color: #3498db;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .situation-summary {
+            background: #2c3e50;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #bdc3c7;
+        }
+        
+        .analysis-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .analysis-card {
+            background: #2c3e50;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .card-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        
+        .primary-card .card-title { color: #e74c3c; }
+        .secondary-card .card-title { color: #f39c12; }
+        .insight-card .card-title { color: #3498db; }
+        
+        .card-content {
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        .key-stats {
+            background: #3498db;
+            color: white;
+            padding: 12px;
+            border-radius: 5px;
+            text-align: center;
+            margin: 15px 0;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .scenario-outcome {
+            background: #2c3e50;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        
+        .outcome-title {
+            font-weight: bold;
+            color: #27ae60;
+            margin-bottom: 8px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="game-state">
+                <div class="state-item">
+                    <div class="state-label">Quarter</div>
+                    <div class="state-value">4th</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Time</div>
+                    <div class="state-value time-value" id="timeDisplay">3:45</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Score</div>
+                    <div class="state-value score-leading" id="scoreDisplay">+3</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Possession</div>
+                    <div class="state-value" id="possessionDisplay">Team A</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Field Pos</div>
+                    <div class="state-value" id="fieldPosDisplay">Own 35</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Down</div>
+                    <div class="state-value" id="downDisplay">1st & 10</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">TO Left</div>
+                    <div class="state-value" id="timeoutsDisplay">2-1</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Time:</label>
+                <input type="range" id="timeSlider" min="0" max="900" value="225" step="15">
+                <span id="timeValue">3:45</span>
+            </div>
+            <div class="control-group">
+                <label>Score Diff:</label>
+                <input type="range" id="scoreSlider" min="-21" max="21" value="3" step="1">
+                <span id="scoreValue">+3</span>
+            </div>
+            <div class="control-group">
+                <label>Possession:</label>
+                <select id="possessionSelect">
+                    <option value="leading">Leading Team</option>
+                    <option value="trailing">Trailing Team</option>
+                    <option value="tied">Tied Game</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Field Pos:</label>
+                <select id="fieldPosSelect">
+                    <option value="own-20">Own 20</option>
+                    <option value="own-35" selected>Own 35</option>
+                    <option value="midfield">Midfield</option>
+                    <option value="opp-35">Opp 35</option>
+                    <option value="red-zone">Red Zone</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Down:</label>
+                <select id="downSelect">
+                    <option value="1st" selected>1st Down</option>
+                    <option value="2nd">2nd Down</option>  
+                    <option value="3rd">3rd Down</option>
+                    <option value="4th">4th Down</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Team A TO:</label>
+                <input type="number" id="teamATimeouts" min="0" max="3" value="2" style="width: 40px;">
+            </div>
+            <div class="control-group">
+                <label>Team B TO:</label>
+                <input type="number" id="teamBTimeouts" min="0" max="3" value="1" style="width: 40px;">
+            </div>
+        </div>
+        
+        <div class="scenario-tabs">
+            <div class="tab active" data-scenario="clock-management">Clock Management</div>
+            <div class="tab" data-scenario="fourth-down">4th Down Decisions</div>
+            <div class="tab" data-scenario="scoring">After Score</div>
+            <div class="tab" data-scenario="kickoff">Kickoff Strategy</div>
+            <div class="tab" data-scenario="two-point">2-Point Decisions</div>
+        </div>
+        
+        <!-- Clock Management Matrix -->
+        <div class="decision-matrix" id="clock-management">
+            <div class="matrix-title">Clock Management Strategy</div>
+            <div class="matrix-grid clock-management-grid" id="clockGrid">
+                <div class="matrix-header"></div>
+                <div class="matrix-header">0-1 min</div>
+                <div class="matrix-header">1-2 min</div>
+                <div class="matrix-header">2-3 min</div>
+                <div class="matrix-header">3-4 min</div>
+                <div class="matrix-header">4-5 min</div>
+                <div class="matrix-header">5-7 min</div>
+                <div class="matrix-header">7-10 min</div>
+                <div class="matrix-header">10+ min</div>
+            </div>
+        </div>
+        
+        <!-- 4th Down Matrix -->
+        <div class="decision-matrix hidden" id="fourth-down">
+            <div class="matrix-title">4th Down Decision Matrix</div>
+            <div class="matrix-grid fourth-down-grid" id="fourthGrid">
+                <div class="matrix-header"></div>
+                <div class="matrix-header">1 yd</div>
+                <div class="matrix-header">2 yd</div>
+                <div class="matrix-header">3 yd</div>
+                <div class="matrix-header">4 yd</div>
+                <div class="matrix-header">5 yd</div>
+                <div class="matrix-header">6-8 yd</div>
+                <div class="matrix-header">9-12 yd</div>
+                <div class="matrix-header">13-20 yd</div>
+                <div class="matrix-header">21+ yd</div>
+                <div class="matrix-header">FG Range</div>
+            </div>
+        </div>
+        
+        <!-- Scoring Matrix -->
+        <div class="decision-matrix hidden" id="scoring">
+            <div class="matrix-title">After Score Decisions</div>
+            <div class="matrix-grid scoring-grid" id="scoringGrid">
+                <div class="matrix-header"></div>
+                <div class="matrix-header">Down 15+</div>
+                <div class="matrix-header">Down 8-14</div>
+                <div class="matrix-header">Down 1-7</div>
+                <div class="matrix-header">Tied</div>
+                <div class="matrix-header">Up 1-7</div>
+                <div class="matrix-header">Up 8+</div>
+            </div>
+        </div>
+        
+        <!-- Kickoff Matrix -->
+        <div class="decision-matrix hidden" id="kickoff">
+            <div class="matrix-title">Kickoff Strategy</div>
+            <div class="matrix-grid kickoff-grid" id="kickoffGrid">
+                <div class="matrix-header"></div>
+                <div class="matrix-header">Down 9+</div>
+                <div class="matrix-header">Down 8</div>
+                <div class="matrix-header">Down 3-7</div>
+                <div class="matrix-header">Down 1-2</div>
+                <div class="matrix-header">Tied</div>
+                <div class="matrix-header">Leading</div>
+            </div>
+        </div>
+        
+        <!-- 2-Point Matrix -->
+        <div class="decision-matrix hidden" id="two-point">
+            <div class="matrix-title">2-Point Conversion Decisions</div>
+            <div class="matrix-grid scoring-grid" id="twoPointGrid">
+                <div class="matrix-header"></div>
+                <div class="matrix-header">Down 15+</div>
+                <div class="matrix-header">Down 8-14</div>
+                <div class="matrix-header">Down 1-7</div>
+                <div class="matrix-header">Tied</div>
+                <div class="matrix-header">Up 1-7</div>
+                <div class="matrix-header">Up 8+</div>
+            </div>
+        </div>
+        
+        <div class="analysis">
+            <div class="analysis-header">
+                <div class="analysis-title" id="analysisTitle">Clock Management Analysis</div>
+                <div class="situation-summary" id="situationSummary">
+                    Leading by 3, Own 35, 1st & 10, 3:45 remaining
+                </div>
+            </div>
+            
+            <div class="analysis-content">
+                <div class="analysis-card primary-card">
+                    <div class="card-title">PRIMARY STRATEGY</div>
+                    <div class="card-content" id="primaryStrategy">
+                        Run the ball conservatively to force opponent timeouts. With a 3-point lead and good field position, prioritize first downs over chunk plays to control the clock.
+                    </div>
+                </div>
+                
+                <div class="analysis-card secondary-card">
+                    <div class="card-title">ALTERNATIVE APPROACH</div>
+                    <div class="card-content" id="alternativeStrategy">
+                        Play-action passes on early downs could catch defense selling out to stop run. Risk-reward favors running, but passing keeps defense honest.
+                    </div>
+                </div>
+                
+                <div class="analysis-card insight-card">
+                    <div class="card-title">KEY INSIGHT</div>
+                    <div class="card-content" id="keyInsight">
+                        Three first downs likely seals the game. Each first down forces opponent to burn timeouts or precious seconds off the clock.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="key-stats" id="keyStats">
+                Every first down burns ~40 seconds + forces timeout usage
+            </div>
+            
+            <div class="scenario-outcome">
+                <div class="outcome-title">MOST LIKELY OUTCOMES</div>
+                <div id="scenarioOutcome">
+                    Success: Game effectively over with sustained drive. Failure: Punt with 2+ minutes left, opponent needs TD + 2PT or FG to tie.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let gameState = {
+            time: 225,
+            scoreDiff: 3,
+            possession: 'leading',
+            fieldPos: 'own-35',
+            down: '1st',
+            teamATimeouts: 2,
+            teamBTimeouts: 1,
+            currentScenario: 'clock-management'
+        };
+        
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return minutes + ':' + secs.toString().padStart(2, '0');
+        }
+        
+        function updateDisplay() {
+            document.getElementById('timeDisplay').textContent = formatTime(gameState.time);
+            document.getElementById('timeValue').textContent = formatTime(gameState.time);
+            
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            scoreDisplay.textContent = gameState.scoreDiff > 0 ? '+' + gameState.scoreDiff : gameState.scoreDiff;
+            scoreDisplay.className = 'state-value ' + (gameState.scoreDiff < 0 ? 'score-trailing' : gameState.scoreDiff > 0 ? 'score-leading' : 'score-tied');
+            document.getElementById('scoreValue').textContent = gameState.scoreDiff > 0 ? '+' + gameState.scoreDiff : gameState.scoreDiff;
+            
+            document.getElementById('possessionDisplay').textContent = gameState.possession === 'leading' ? 'Leading' : gameState.possession === 'trailing' ? 'Trailing' : 'Tied';
+            document.getElementById('fieldPosDisplay').textContent = getFieldPosText(gameState.fieldPos);
+            document.getElementById('downDisplay').textContent = gameState.down + ' & 10';
+            document.getElementById('timeoutsDisplay').textContent = gameState.teamATimeouts + '-' + gameState.teamBTimeouts;
+            
+            generateCurrentMatrix();
+            updateAnalysis();
+        }
+        
+        function getFieldPosText(fieldPos) {
+            const positions = {
+                'own-20': 'Own 20',
+                'own-35': 'Own 35', 
+                'midfield': 'Midfield',
+                'opp-35': 'Opp 35',
+                'red-zone': 'Red Zone'
+            };
+            return positions[fieldPos];
+        }
+        
+        function generateCurrentMatrix() {
+            const scenario = gameState.currentScenario;
+            
+            if (scenario === 'clock-management') {
+                generateClockManagementMatrix();
+            } else if (scenario === 'fourth-down') {
+                generateFourthDownMatrix();
+            } else if (scenario === 'scoring') {
+                generateScoringMatrix();
+            } else if (scenario === 'kickoff') {
+                generateKickoffMatrix();
+            } else if (scenario === 'two-point') {
+                generateTwoPointMatrix();
+            }
+        }
+        
+        function generateClockManagementMatrix() {
+            const grid = document.getElementById('clockGrid');
+            
+            while (grid.children.length > 9) {
+                grid.removeChild(grid.lastChild);
+            }
+            
+            const scoreSituations = ['Up 14+', 'Up 7-13', 'Up 1-6', 'Tied', 'Down 1-6', 'Down 7-13', 'Down 14+'];
+            
+            scoreSituations.forEach(function(situation) {
+                const rowLabel = document.createElement('div');
+                rowLabel.className = 'matrix-row-label';
+                rowLabel.textContent = situation;
+                grid.appendChild(rowLabel);
+                
+                for (let timeSlot = 0; timeSlot < 8; timeSlot++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell';
+                    
+                    const strategy = getClockStrategy(situation, timeSlot);
+                    cell.classList.add(strategy.type);
+                    cell.innerHTML = '<div>' + strategy.text + '</div>';
+                    
+                    cell.onclick = function() { updateClockAnalysis(situation, timeSlot, strategy); };
+                    grid.appendChild(cell);
+                }
+            });
+        }
+        
+        function generateFourthDownMatrix() {
+            const grid = document.getElementById('fourthGrid');
+            
+            while (grid.children.length > 11) {
+                grid.removeChild(grid.lastChild);
+            }
+            
+            const fieldPositions = ['Own 1-20', 'Own 21-40', 'Own 41-50', '50 to Opp 40', 'Opp 39-20', 'Red Zone'];
+            
+            fieldPositions.forEach(function(position) {
+                const rowLabel = document.createElement('div');
+                rowLabel.className = 'matrix-row-label';
+                rowLabel.textContent = position;
+                grid.appendChild(rowLabel);
+                
+                for (let yards = 0; yards < 10; yards++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell';
+                    
+                    const decision = getFourthDownDecision(position, yards);
+                    cell.classList.add(decision.type);
+                    cell.innerHTML = '<div>' + decision.text + '</div>';
+                    
+                    grid.appendChild(cell);
+                }
+            });
+        }
+        
+        function generateScoringMatrix() {
+            const grid = document.getElementById('scoringGrid');
+            
+            while (grid.children.length > 7) {
+                grid.removeChild(grid.lastChild);
+            }
+            
+            const timeSlots = ['0-1 min', '1-2 min', '2-4 min', '4-8 min', '8+ min'];
+            
+            timeSlots.forEach(function(timeSlot) {
+                const rowLabel = document.createElement('div');
+                rowLabel.className = 'matrix-row-label';
+                rowLabel.textContent = timeSlot;
+                grid.appendChild(rowLabel);
+                
+                for (let scoreDiff = 0; scoreDiff < 6; scoreDiff++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell';
+                    
+                    const decision = getScoringDecision(timeSlot, scoreDiff);
+                    cell.classList.add(decision.type);
+                    cell.innerHTML = '<div>' + decision.text + '</div>';
+                    
+                    grid.appendChild(cell);
+                }
+            });
+        }
+        
+        function generateKickoffMatrix() {
+            const grid = document.getElementById('kickoffGrid');
+            
+            while (grid.children.length > 7) {
+                grid.removeChild(grid.lastChild);
+            }
+            
+            const timeSlots = ['0-1 min', '1-2 min', '2-4 min', '4-8 min', '8+ min'];
+            
+            timeSlots.forEach(function(timeSlot) {
+                const rowLabel = document.createElement('div');
+                rowLabel.className = 'matrix-row-label';
+                rowLabel.textContent = timeSlot;
+                grid.appendChild(rowLabel);
+                
+                for (let scoreDiff = 0; scoreDiff < 6; scoreDiff++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell';
+                    
+                    const decision = getKickoffDecision(timeSlot, scoreDiff);
+                    cell.classList.add(decision.type);
+                    cell.innerHTML = '<div>' + decision.text + '</div>';
+                    
+                    grid.appendChild(cell);
+                }
+            });
+        }
+        
+        function generateTwoPointMatrix() {
+            const grid = document.getElementById('twoPointGrid');
+            
+            while (grid.children.length > 7) {
+                grid.removeChild(grid.lastChild);
+            }
+            
+            const timeSlots = ['Early Game', 'Mid Game', '4th Qtr', 'Under 5 min', 'Under 2 min'];
+            
+            timeSlots.forEach(function(timeSlot) {
+                const rowLabel = document.createElement('div');
+                rowLabel.className = 'matrix-row-label';
+                rowLabel.textContent = timeSlot;
+                grid.appendChild(rowLabel);
+                
+                for (let scoreDiff = 0; scoreDiff < 6; scoreDiff++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell';
+                    
+                    const decision = getTwoPointDecision(timeSlot, scoreDiff);
+                    cell.classList.add(decision.type);
+                    cell.innerHTML = '<div>' + decision.text + '</div>';
+                    
+                    grid.appendChild(cell);
+                }
+            });
+        }
+        
+        function getClockStrategy(situation, timeSlot) {
+            // Convert timeSlot index to actual time ranges for logic
+            const timeRanges = [60, 120, 180, 240, 300, 420, 600, 900]; // max seconds for each slot
+            const maxTimeForSlot = timeRanges[timeSlot];
+            
+            // Use actual game state time for more precise decisions
+            const actualTime = gameState.time;
+            const actualScore = gameState.scoreDiff;
+            
+            if (situation.includes('Up')) {
+                const leadAmount = parseInt(situation.match(/\d+/)[0]);
+                
+                // Kneel logic: leading with very little time
+                if (actualTime <= 60 && leadAmount >= 1) return { type: 'kneel', text: 'KNEEL' };
+                if (actualTime <= 90 && leadAmount >= 7) return { type: 'kneel', text: 'KNEEL' };
+                if (actualTime <= 120 && leadAmount >= 14) return { type: 'kneel', text: 'KNEEL' };
+                
+                // Run clock scenarios
+                if (timeSlot <= 1) return { type: 'run-clock', text: 'RUN CLOCK' };
+                if (timeSlot <= 3) return { type: 'run-clock', text: 'RUN CLOCK' };
+                if (timeSlot <= 5) return { type: 'run-conservative', text: 'RUN SAFE' };
+                return { type: 'run-conservative', text: 'BALANCED' };
+            }
+            
+            if (situation.includes('Down')) {
+                if (timeSlot <= 1) return { type: 'hail-mary', text: 'HAIL MARY' };
+                if (timeSlot <= 2) return { type: 'two-minute', text: '2-MIN DRILL' };
+                if (timeSlot <= 4) return { type: 'pass-selective', text: 'HURRY UP' };
+                return { type: 'two-minute', text: 'AGGRESSIVE' };
+            }
+            
+            // Tied game
+            if (timeSlot <= 2) return { type: 'pass-selective', text: 'CAREFUL AGG' };
+            return { type: 'run-conservative', text: 'CONTROL' };
+        }
+        
+        function getFourthDownDecision(position, yards) {
+            if (position === 'Red Zone') {
+                if (yards <= 2) return { type: 'go-4th', text: 'GO' };
+                return { type: 'fg-4th', text: 'FG' };
+            }
+            
+            if (position.includes('Own')) {
+                if (yards <= 1 && gameState.time < 120) return { type: 'go-4th', text: 'GO' };
+                return { type: 'punt-4th', text: 'PUNT' };
+            }
+            
+            if (yards <= 3) return { type: 'go-4th', text: 'GO' };
+            return { type: 'punt-4th', text: 'PUNT' };
+        }
+        
+        function getScoringDecision(timeSlot, scoreDiff) {
+            const situations = ['Down 15+', 'Down 8-14', 'Down 1-7', 'Tied', 'Up 1-7', 'Up 8+'];
+            const situation = situations[scoreDiff];
+            
+            if (situation.includes('Down 8') || situation.includes('Down 15')) {
+                return { type: 'go-2pt', text: '2-PT' };
+            }
+            
+            return { type: 'pat', text: 'PAT' };
+        }
+        
+        function getKickoffDecision(timeSlot, scoreDiff) {
+            const situations = ['Down 9+', 'Down 8', 'Down 3-7', 'Down 1-2', 'Tied', 'Leading'];
+            const situation = situations[scoreDiff];
+            
+            if (situation === 'Down 9+' || situation === 'Down 8') {
+                if (timeSlot <= 2) return { type: 'onside-kick', text: 'ONSIDE' };
+                return { type: 'normal-kick', text: 'NORMAL' };
+            }
+            
+            if (situation.includes('Down') && timeSlot <= 1) {
+                return { type: 'onside-kick', text: 'ONSIDE' };
+            }
+            
+            if (situation === 'Leading' && timeSlot <= 2) {
+                return { type: 'squib-kick', text: 'SQUIB' };
+            }
+            
+            return { type: 'normal-kick', text: 'NORMAL' };
+        }
+        
+        function getTwoPointDecision(timeSlot, scoreDiff) {
+            const situations = ['Down 15+', 'Down 8-14', 'Down 1-7', 'Tied', 'Up 1-7', 'Up 8+'];
+            const situation = situations[scoreDiff];
+            
+            if (situation === 'Down 15+' && timeSlot >= 2) {
+                return { type: 'go-2pt', text: '2-PT' };
+            }
+            
+            if (situation === 'Down 8-14' && timeSlot >= 3) {
+                return { type: 'go-2pt', text: '2-PT' };
+            }
+            
+            return { type: 'pat', text: 'PAT' };
+        }
+        
+        function updateClockAnalysis(situation, timeSlot, strategy) {
+            const timeSlots = ['0-1 min', '1-2 min', '2-3 min', '3-4 min', '4-5 min', '5-7 min', '7-10 min', '10+ min'];
+            const timeText = timeSlots[timeSlot];
+            
+            document.getElementById('situationSummary').textContent = situation + ', ' + timeText;
+            
+            let primary, secondary, insight, stats, outcome;
+            
+            if (strategy.type === 'kneel') {
+                primary = "Victory formation - kneel down to run out the clock. The lead is secure and time remaining makes a comeback mathematically impossible.";
+                secondary = "Running a play risks fumble with no strategic benefit. Only kneel unless opponent has timeouts and can stop clock.";
+                insight = "Game is effectively over. Focus on clean execution of victory formation.";
+                stats = "Each kneel burns ~40 seconds with no timeouts";
+                outcome = "Success: Game ends with victory. Risk: Fumbled snap is only way to lose from here.";
+            } else if (strategy.type === 'run-clock') {
+                primary = "Run the ball to force opponent timeouts and control clock. Every first down significantly reduces opponent's chances.";
+                secondary = "Safe passing plays on obvious run downs could catch defense off-guard, but risk stopping clock.";
+                insight = "Clock management is more important than yardage. Force opponent to use timeouts.";
+                stats = "Each first down burns ~40 seconds + timeout";
+                outcome = "Success: Run out clock or force opponent into desperation mode. Risk: 3-and-out gives opponent time.";
+            } else if (strategy.type === 'two-minute') {
+                primary = "Aggressive passing attack with clock management. Use timeouts strategically and target sidelines.";
+                secondary = "Running plays only if defense shows obvious pass coverage - need to maximize yardage per play.";
+                insight = "Every play matters. Balance speed with ball security - can't afford turnovers.";
+                stats = "Need ~60-80 yards in limited plays";
+                outcome = "Success: Score to tie/take lead. Risk: Incomplete passes stop clock, helping opponent.";
+            } else {
+                primary = "Balanced approach based on field position and down/distance. Mix run and pass to keep defense honest.";
+                secondary = "Adjust strategy based on opponent's defensive alignment and timeout situation.";
+                insight = "Maintain strategic flexibility while controlling the game tempo.";
+                stats = "Focus on first downs and field position";
+                outcome = "Success: Maintain control of game flow. Risk: Predictable play-calling.";
+            }
+            
+            document.getElementById('primaryStrategy').textContent = primary;
+            document.getElementById('alternativeStrategy').textContent = secondary;
+            document.getElementById('keyInsight').textContent = insight;
+            document.getElementById('keyStats').textContent = stats;
+            document.getElementById('scenarioOutcome').textContent = outcome;
+        }
+        
+        function updateAnalysis() {
+            const situation = (gameState.possession === 'leading' ? 'Leading' : gameState.possession === 'trailing' ? 'Trailing' : 'Tied') + ' by ' + Math.abs(gameState.scoreDiff);
+            document.getElementById('situationSummary').textContent = 
+                situation + ', ' + getFieldPosText(gameState.fieldPos) + ', ' + gameState.down + ' & 10, ' + formatTime(gameState.time) + ' remaining';
+            
+            const titles = {
+                'clock-management': 'Clock Management Analysis',
+                'fourth-down': '4th Down Decision Analysis', 
+                'scoring': 'After Score Analysis',
+                'kickoff': 'Kickoff Strategy Analysis',
+                'two-point': '2-Point Conversion Analysis'
+            };
+            document.getElementById('analysisTitle').textContent = titles[gameState.currentScenario];
+            
+            if (gameState.currentScenario === 'clock-management') {
+                if (gameState.scoreDiff > 0 && gameState.time < 120) {
+                    document.getElementById('primaryStrategy').textContent = 
+                        "Run the ball and force opponent timeouts. With the lead and under 2 minutes, clock management is priority over yardage.";
+                    document.getElementById('alternativeStrategy').textContent = 
+                        "Play-action could work if defense sells out against run, but risk of incompletion stopping clock.";
+                    document.getElementById('keyInsight').textContent = 
+                        "Each first down likely seals the victory. Focus on high-percentage plays.";
+                    document.getElementById('keyStats').textContent = 
+                        "Opponent needs timeouts + quick scores - make them earn every second";
+                    document.getElementById('scenarioOutcome').textContent = 
+                        "Success: Victory formation with under 1 minute. Risk: 3-and-out gives opponent final drive opportunity.";
+                }
+            }
+        }
+        
+        // Event Listeners
+        document.getElementById('timeSlider').addEventListener('input', function(e) {
+            gameState.time = parseInt(e.target.value);
+            updateDisplay();
+        });
+        
+        document.getElementById('scoreSlider').addEventListener('input', function(e) {
+            gameState.scoreDiff = parseInt(e.target.value);
+            updateDisplay();
+        });
+        
+        document.getElementById('possessionSelect').addEventListener('change', function(e) {
+            gameState.possession = e.target.value;
+            updateDisplay();
+        });
+        
+        document.getElementById('fieldPosSelect').addEventListener('change', function(e) {
+            gameState.fieldPos = e.target.value;
+            updateDisplay();
+        });
+        
+        document.getElementById('downSelect').addEventListener('change', function(e) {
+            gameState.down = e.target.value;
+            updateDisplay();
+        });
+        
+        document.getElementById('teamATimeouts').addEventListener('input', function(e) {
+            gameState.teamATimeouts = parseInt(e.target.value);
+            updateDisplay();
+        });
+        
+        document.getElementById('teamBTimeouts').addEventListener('input', function(e) {
+            gameState.teamBTimeouts = parseInt(e.target.value);
+            updateDisplay();
+        });
+        
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+                tab.classList.add('active');
+                
+                document.querySelectorAll('.decision-matrix').forEach(function(matrix) { matrix.classList.add('hidden'); });
+                
+                const scenario = tab.dataset.scenario;
+                gameState.currentScenario = scenario;
+                document.getElementById(scenario).classList.remove('hidden');
+                
+                updateDisplay();
+            });
+        });
+        
+        // Initialize
+        updateDisplay();
+    </script>
+</body>
+</html>
