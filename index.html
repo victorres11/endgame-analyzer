@@ -290,6 +290,25 @@
             margin-bottom: 8px;
         }
         
+        .matrix-row-label.current-situation {
+            background: #3498db;
+            color: white;
+            border: 2px solid #2980b9;
+        }
+        
+        .matrix-cell.current-situation {
+            border: 2px solid #3498db;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+        
+        .matrix-row-label.other-situation {
+            opacity: 0.4;
+        }
+        
+        .matrix-cell.other-situation {
+            opacity: 0.4;
+        }
+        
         .hidden {
             display: none;
         }
@@ -351,13 +370,8 @@
             </div>
             <div class="control-group">
                 <label>Field Pos:</label>
-                <select id="fieldPosSelect">
-                    <option value="own-20">Own 20</option>
-                    <option value="own-35" selected>Own 35</option>
-                    <option value="midfield">Midfield</option>
-                    <option value="opp-35">Opp 35</option>
-                    <option value="red-zone">Red Zone</option>
-                </select>
+                <input type="range" id="fieldPosSlider" min="-50" max="50" value="35" step="1">
+                <span id="fieldPosValue">Own 35</span>
             </div>
             <div class="control-group">
                 <label>Down:</label>
@@ -511,7 +525,7 @@
             time: 225,
             scoreDiff: 3,
             possession: 'leading',
-            fieldPos: 'own-35',
+            fieldPos: 35,
             down: '1st',
             teamATimeouts: 2,
             teamBTimeouts: 1,
@@ -534,7 +548,7 @@
             document.getElementById('scoreValue').textContent = gameState.scoreDiff > 0 ? '+' + gameState.scoreDiff : gameState.scoreDiff;
             
             document.getElementById('possessionDisplay').textContent = gameState.possession === 'leading' ? 'Leading' : gameState.possession === 'trailing' ? 'Trailing' : 'Tied';
-            document.getElementById('fieldPosDisplay').textContent = getFieldPosText(gameState.fieldPos);
+            document.getElementById('fieldPosDisplay').textContent = formatFieldPosition(gameState.fieldPos);
             document.getElementById('downDisplay').textContent = gameState.down + ' & 10';
             document.getElementById('timeoutsDisplay').textContent = gameState.teamATimeouts + '-' + gameState.teamBTimeouts;
             
@@ -543,14 +557,15 @@
         }
         
         function getFieldPosText(fieldPos) {
-            const positions = {
-                'own-20': 'Own 20',
-                'own-35': 'Own 35', 
-                'midfield': 'Midfield',
-                'opp-35': 'Opp 35',
-                'red-zone': 'Red Zone'
-            };
-            return positions[fieldPos];
+            if (fieldPos === 0) return "50 Yard Line";
+            if (fieldPos > 0) return "Own " + fieldPos;
+            return "Opp " + Math.abs(fieldPos);
+        }
+        
+        function formatFieldPosition(fieldPos) {
+            if (fieldPos === 0) return "50";
+            if (fieldPos > 0) return "Own " + fieldPos;
+            return "Opp " + Math.abs(fieldPos);
         }
         
         function generateCurrentMatrix() {
@@ -582,6 +597,15 @@
                 const rowLabel = document.createElement('div');
                 rowLabel.className = 'matrix-row-label';
                 rowLabel.textContent = situation;
+                
+                // Determine if this row matches current game state
+                const isCurrentSituation = isCurrentScoreSituation(situation);
+                if (isCurrentSituation) {
+                    rowLabel.classList.add('current-situation');
+                } else {
+                    rowLabel.classList.add('other-situation');
+                }
+                
                 grid.appendChild(rowLabel);
                 
                 for (let timeSlot = 0; timeSlot < 8; timeSlot++) {
@@ -592,10 +616,31 @@
                     cell.classList.add(strategy.type);
                     cell.innerHTML = '<div>' + strategy.text + '</div>';
                     
+                    // Highlight cells in current situation
+                    if (isCurrentSituation) {
+                        cell.classList.add('current-situation');
+                    } else {
+                        cell.classList.add('other-situation');
+                    }
+                    
                     cell.onclick = function() { updateClockAnalysis(situation, timeSlot, strategy); };
                     grid.appendChild(cell);
                 }
             });
+        }
+        
+        function isCurrentScoreSituation(situation) {
+            const score = gameState.scoreDiff;
+            
+            if (situation === 'Up 14+') return score >= 14;
+            if (situation === 'Up 7-13') return score >= 7 && score <= 13;
+            if (situation === 'Up 1-6') return score >= 1 && score <= 6;
+            if (situation === 'Tied') return score === 0;
+            if (situation === 'Down 1-6') return score >= -6 && score <= -1;
+            if (situation === 'Down 7-13') return score >= -13 && score <= -7;
+            if (situation === 'Down 14+') return score <= -14;
+            
+            return false;
         }
         
         function generateFourthDownMatrix() {
@@ -606,11 +651,20 @@
             }
             
             const fieldPositions = ['Own 1-20', 'Own 21-40', 'Own 41-50', '50 to Opp 40', 'Opp 39-20', 'Red Zone'];
+            const currentFieldPosition = getCurrentFieldPositionCategory();
             
-            fieldPositions.forEach(function(position) {
+            fieldPositions.forEach(function(position, index) {
                 const rowLabel = document.createElement('div');
                 rowLabel.className = 'matrix-row-label';
                 rowLabel.textContent = position;
+                
+                const isCurrentPosition = (index === currentFieldPosition);
+                if (isCurrentPosition) {
+                    rowLabel.classList.add('current-situation');
+                } else {
+                    rowLabel.classList.add('other-situation');
+                }
+                
                 grid.appendChild(rowLabel);
                 
                 for (let yards = 0; yards < 10; yards++) {
@@ -621,9 +675,26 @@
                     cell.classList.add(decision.type);
                     cell.innerHTML = '<div>' + decision.text + '</div>';
                     
+                    if (isCurrentPosition) {
+                        cell.classList.add('current-situation');
+                    } else {
+                        cell.classList.add('other-situation');
+                    }
+                    
                     grid.appendChild(cell);
                 }
             });
+        }
+        
+        function getCurrentFieldPositionCategory() {
+            const fieldPos = gameState.fieldPos;
+            
+            if (fieldPos >= 20) return 0;              // Own 1-20 (deep in own territory)
+            if (fieldPos >= -10) return 1;             // Own 21-40  
+            if (fieldPos >= -30) return 2;             // Own 41-50 / Midfield area
+            if (fieldPos >= -40) return 3;             // 50 to Opp 40
+            if (fieldPos >= -20) return 4;             // Opp 39-20
+            return 5;                                  // Red Zone (inside opp 20)
         }
         
         function generateScoringMatrix() {
@@ -635,10 +706,22 @@
             
             const timeSlots = ['0-1 min', '1-2 min', '2-4 min', '4-8 min', '8+ min'];
             
-            timeSlots.forEach(function(timeSlot) {
+            // Determine current time slot for highlighting
+            const currentTimeSlot = getCurrentTimeSlot();
+            
+            timeSlots.forEach(function(timeSlot, index) {
                 const rowLabel = document.createElement('div');
                 rowLabel.className = 'matrix-row-label';
                 rowLabel.textContent = timeSlot;
+                
+                // Highlight if this is the current time situation
+                const isCurrentTime = (index === currentTimeSlot);
+                if (isCurrentTime) {
+                    rowLabel.classList.add('current-situation');
+                } else {
+                    rowLabel.classList.add('other-situation');
+                }
+                
                 grid.appendChild(rowLabel);
                 
                 for (let scoreDiff = 0; scoreDiff < 6; scoreDiff++) {
@@ -648,6 +731,13 @@
                     const decision = getScoringDecision(timeSlot, scoreDiff);
                     cell.classList.add(decision.type);
                     cell.innerHTML = '<div>' + decision.text + '</div>';
+                    
+                    // Highlight current time row
+                    if (isCurrentTime) {
+                        cell.classList.add('current-situation');
+                    } else {
+                        cell.classList.add('other-situation');
+                    }
                     
                     grid.appendChild(cell);
                 }
@@ -662,11 +752,20 @@
             }
             
             const timeSlots = ['0-1 min', '1-2 min', '2-4 min', '4-8 min', '8+ min'];
+            const currentTimeSlot = getCurrentTimeSlot();
             
-            timeSlots.forEach(function(timeSlot) {
+            timeSlots.forEach(function(timeSlot, index) {
                 const rowLabel = document.createElement('div');
                 rowLabel.className = 'matrix-row-label';
                 rowLabel.textContent = timeSlot;
+                
+                const isCurrentTime = (index === currentTimeSlot);
+                if (isCurrentTime) {
+                    rowLabel.classList.add('current-situation');
+                } else {
+                    rowLabel.classList.add('other-situation');
+                }
+                
                 grid.appendChild(rowLabel);
                 
                 for (let scoreDiff = 0; scoreDiff < 6; scoreDiff++) {
@@ -676,6 +775,12 @@
                     const decision = getKickoffDecision(timeSlot, scoreDiff);
                     cell.classList.add(decision.type);
                     cell.innerHTML = '<div>' + decision.text + '</div>';
+                    
+                    if (isCurrentTime) {
+                        cell.classList.add('current-situation');
+                    } else {
+                        cell.classList.add('other-situation');
+                    }
                     
                     grid.appendChild(cell);
                 }
@@ -690,11 +795,20 @@
             }
             
             const timeSlots = ['Early Game', 'Mid Game', '4th Qtr', 'Under 5 min', 'Under 2 min'];
+            const currentGamePhase = getCurrentGamePhase();
             
-            timeSlots.forEach(function(timeSlot) {
+            timeSlots.forEach(function(timeSlot, index) {
                 const rowLabel = document.createElement('div');
                 rowLabel.className = 'matrix-row-label';
                 rowLabel.textContent = timeSlot;
+                
+                const isCurrentPhase = (index === currentGamePhase);
+                if (isCurrentPhase) {
+                    rowLabel.classList.add('current-situation');
+                } else {
+                    rowLabel.classList.add('other-situation');
+                }
+                
                 grid.appendChild(rowLabel);
                 
                 for (let scoreDiff = 0; scoreDiff < 6; scoreDiff++) {
@@ -705,9 +819,32 @@
                     cell.classList.add(decision.type);
                     cell.innerHTML = '<div>' + decision.text + '</div>';
                     
+                    if (isCurrentPhase) {
+                        cell.classList.add('current-situation');
+                    } else {
+                        cell.classList.add('other-situation');
+                    }
+                    
                     grid.appendChild(cell);
                 }
             });
+        }
+        
+        function getCurrentTimeSlot() {
+            const time = gameState.time;
+            if (time <= 60) return 0;      // 0-1 min
+            if (time <= 120) return 1;     // 1-2 min  
+            if (time <= 240) return 2;     // 2-4 min
+            if (time <= 480) return 3;     // 4-8 min
+            return 4;                      // 8+ min
+        }
+        
+        function getCurrentGamePhase() {
+            const time = gameState.time;
+            if (time <= 120) return 4;     // Under 2 min
+            if (time <= 300) return 3;     // Under 5 min
+            if (time <= 900) return 2;     // 4th Qtr (assuming we're in 4th quarter)
+            return 1;                      // Mid Game (simplified)
         }
         
         function getClockStrategy(situation, timeSlot) {
@@ -851,7 +988,7 @@
         function updateAnalysis() {
             const situation = (gameState.possession === 'leading' ? 'Leading' : gameState.possession === 'trailing' ? 'Trailing' : 'Tied') + ' by ' + Math.abs(gameState.scoreDiff);
             document.getElementById('situationSummary').textContent = 
-                situation + ', ' + getFieldPosText(gameState.fieldPos) + ', ' + gameState.down + ' & 10, ' + formatTime(gameState.time) + ' remaining';
+                situation + ', ' + formatFieldPosition(gameState.fieldPos) + ', ' + gameState.down + ' & 10, ' + formatTime(gameState.time) + ' remaining';
             
             const titles = {
                 'clock-management': 'Clock Management Analysis',
@@ -894,8 +1031,9 @@
             updateDisplay();
         });
         
-        document.getElementById('fieldPosSelect').addEventListener('change', function(e) {
-            gameState.fieldPos = e.target.value;
+        document.getElementById('fieldPosSlider').addEventListener('input', function(e) {
+            gameState.fieldPos = parseInt(e.target.value);
+            document.getElementById('fieldPosValue').textContent = formatFieldPosition(gameState.fieldPos);
             updateDisplay();
         });
         
